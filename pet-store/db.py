@@ -8,11 +8,10 @@ class PetStoreDB:
     means one new instance, zero code changes.
     """
 
-    def __init__(self, mongo_uri, db_name, collection_name, store_id):
+    def __init__(self, mongo_uri, db_name, collection_name):
         client = MongoClient(mongo_uri)
         db = client[db_name]
         self._col = db[collection_name]
-        self._counters = db[f"counters_{store_id}"]
 
     def create_indexes(self):
         self._col.create_index("type")
@@ -31,12 +30,3 @@ class PetStoreDB:
 
     def delete(self, id):
         self._col.delete_one({"id": id})
-
-    def next_id(self):
-        result = self._counters.find_one_and_update(
-            {"_id": "pet_type_id"},
-            {"$inc": {"seq": 1}},
-            upsert=True,
-            return_document=True,
-        )
-        return str(result["seq"])

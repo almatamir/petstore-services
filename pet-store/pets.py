@@ -1,5 +1,6 @@
 # pets.py - Pet Store Service with MongoDB Persistence
 import os
+import uuid
 import requests
 import re
 from datetime import datetime
@@ -30,7 +31,7 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-db = PetStoreDB(MONGO_URI, DB_NAME, COLLECTION_NAME, STORE_ID)
+db = PetStoreDB(MONGO_URI, DB_NAME, COLLECTION_NAME)
 db.create_indexes()
 
 
@@ -185,7 +186,7 @@ def create_pet_type():
     taxonomy = exact_match.get('taxonomy', {})
     characteristics = exact_match.get('characteristics', {})
 
-    new_id = db.next_id()
+    new_id = str(uuid.uuid4())
 
     new_pet_type = {
         "id": new_id,
