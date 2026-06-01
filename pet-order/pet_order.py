@@ -63,10 +63,16 @@ def get_all_pet_types_from_store(store_num):
     return []
 
 def find_pet_type_by_name_in_store(store_num, pet_type_name):
-    pet_types = get_all_pet_types_from_store(store_num)
-    for pt in pet_types:
-        if pt.get('type', '').lower() == pet_type_name.lower():
-            return pt
+    url = get_pet_store_url(store_num)
+    if not url:
+        return None
+    try:
+        response = requests.get(f"{url}/pet-types", params={"type": pet_type_name}, timeout=10)
+        if response.ok:
+            results = response.json()
+            return results[0] if results else None
+    except Exception as e:
+        logger.error(f"Error finding pet type {pet_type_name} in store {store_num}: {e}")
     return None
 
 def get_pets_of_type_from_store(store_num, pet_type_id):

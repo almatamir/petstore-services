@@ -14,8 +14,14 @@ class PetStoreDB:
         self._col = db[collection_name]
         self._counters = db[f"counters_{store_id}"]
 
+    def create_indexes(self):
+        self._col.create_index("type")
+
     def find_all(self):
         return list(self._col.find({}))
+
+    def find_by_filter(self, query):
+        return list(self._col.find(query))
 
     def find_by_id(self, id):
         return self._col.find_one({"id": id})

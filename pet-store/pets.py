@@ -31,6 +31,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 db = PetStoreDB(MONGO_URI, DB_NAME, COLLECTION_NAME, STORE_ID)
+db.create_indexes()
 
 
 # --- Helper Functions ---
@@ -211,32 +212,27 @@ def get_pet_types():
         if key not in allowed_params:
             return jsonify([]), 200
 
-    filtered_results = db.find_all()
-
+    # Push filters to MongoDB — uses the index on 'type' instead of scanning everything
+    mongo_query = {}
     if 'id' in query_params:
-        filtered_results = [pt for pt in filtered_results if pt['id'] == query_params['id']]
+        mongo_query['id'] = query_params['id']
     if 'type' in query_params:
-        filtered_results = [pt for pt in filtered_results if case_insensitive_compare(pt.get('type'), query_params['type'])]
+        mongo_query['type'] = {'$regex': f"^{query_params['type']}$", '$options': 'i'}
     if 'family' in query_params:
-        filtered_results = [pt for pt in filtered_results if case_insensitive_compare(pt.get('family'), query_params['family'])]
+        mongo_query['family'] = {'$regex': f"^{query_params['family']}$", '$options': 'i'}
     if 'genus' in query_params:
-        filtered_results = [pt for pt in filtered_results if case_insensitive_compare(pt.get('genus'), query_params['genus'])]
+        mongo_query['genus'] = {'$regex': f"^{query_params['genus']}$", '$options': 'i'}
     if 'lifespan' in query_params:
         try:
-            lifespan_query = int(query_params['lifespan'])
-            filtered_results = [pt for pt in filtered_results if pt.get('lifespan') == lifespan_query]
+            mongo_query['lifespan'] = int(query_params['lifespan'])
         except ValueError:
             return bad_request(None)
 
+    filtered_results = db.find_by_filter(mongo_query) if mongo_query else db.find_all()
+
+    # hasAttribute requires array element matching — kept in Python for simplicity
     if 'hasAttribute' in query_params:
         attr = query_params['hasAttribute'].strip().lower()
-        all_pet_types = db.find_all()
-        all_attributes = set()
-        for pt in all_pet_types:
-            for a in pt.get('attributes', []):
-                all_attributes.add(a.lower())
-        if attr not in all_attributes:
-            return jsonify([]), 200
         filtered_results = [
             pt for pt in filtered_results
             if any(a.lower() == attr for a in pt.get('attributes', []))
