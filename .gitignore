@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 *.tar
 *.log
+k8s/secret-local.yaml

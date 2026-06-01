@@ -16,7 +16,7 @@ spec:
       containers:
         - name: pet-order
           image: pet-order:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:

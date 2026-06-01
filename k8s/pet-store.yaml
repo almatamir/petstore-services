@@ -17,7 +17,7 @@ spec:
       containers:
         - name: pet-store
           image: pet-store:latest
-          imagePullPolicy: Never   # use IfNotPresent when pulling from a registry
+          imagePullPolicy: IfNotPresent   # use IfNotPresent when pulling from a registry
           ports:
             - containerPort: 8000
           env:
@@ -73,7 +73,7 @@ spec:
       containers:
         - name: pet-store
           image: pet-store:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           env:
