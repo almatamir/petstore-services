@@ -1,0 +1,10 @@
+query: 1,family=Canidae;
+query: 2,genus=Canis;
+purchase: {"purchaser": "Customer_01", "pet-type": "Golden Retriever", "store": 1};
+query: 1,type=Abyssinian;
+query: 2,lifespan=15;
+purchase: {"purchaser": "Customer_02", "pet-type": "bulldog", "store": 2, "pet-name": "Lemon"};
+query: 1,genus=Felis;
+query: 2,family=Canidae;
+purchase: {"purchaser": "Customer_03", "pet-type": "Abyssinian", "store": 1};
+query: 1,lifespan=12;

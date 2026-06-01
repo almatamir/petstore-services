@@ -1,0 +1,464 @@
+name: assignment4
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NINJA_API_KEY: ${{ secrets.NINJA_API_KEY }}
+      OWNER_SECRET: ${{ secrets.OWNER_SECRET }}
+    outputs:
+      pet_store_built: ${{ steps.build_pet_store.outcome }}
+      pet_order_built: ${{ steps.build_pet_order.outcome }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Record start time and submitter names
+        run: |
+          echo "$(date -Iminutes)" > log.txt
+          echo "Amit Cohen, Alma Tamir" >> log.txt
+      
+      - name: Build pet-store image
+        id: build_pet_store
+        continue-on-error: true
+        run: |
+          docker build -t pet-store:latest ./pet-store
+      
+      - name: Log and fail if pet-store build failed
+        if: steps.build_pet_store.outcome != 'success'
+        run: |
+          echo "image pet-store not able to be built;" >> log.txt
+      
+      - name: Upload log and exit if pet-store failed
+        if: steps.build_pet_store.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-build
+          path: log.txt
+          retention-days: 1
+      
+      - name: Exit if pet-store failed
+        if: steps.build_pet_store.outcome != 'success'
+        run: exit 1
+      
+      - name: Build pet-order image
+        id: build_pet_order
+        continue-on-error: true
+        run: |
+          docker build -t pet-order:latest ./pet-order
+      
+      - name: Log and fail if pet-order build failed
+        if: steps.build_pet_order.outcome != 'success'
+        run: |
+          echo "image pet-store successfully built;image pet-order not able to be built;" >> log.txt
+      
+      - name: Upload log and exit if pet-order failed
+        if: steps.build_pet_order.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-build
+          path: log.txt
+          retention-days: 1
+      
+      - name: Exit if pet-order failed
+        if: steps.build_pet_order.outcome != 'success'
+        run: exit 1
+      
+      - name: Log successful builds
+        run: |
+          echo "image pet-store successfully built;image pet-order successfully built;" >> log.txt
+      
+      - name: Save Docker images
+        run: |
+          docker save pet-store:latest -o pet-store-image.tar
+          docker save pet-order:latest -o pet-order-image.tar
+      
+      - name: Upload pet-store image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pet-store-image
+          path: pet-store-image.tar
+          retention-days: 1
+      
+      - name: Upload pet-order image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pet-order-image
+          path: pet-order-image.tar
+          retention-days: 1
+      
+      - name: Upload log artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-build
+          path: log.txt
+          retention-days: 1
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      NINJA_API_KEY: ${{ secrets.NINJA_API_KEY }}
+      OWNER_SECRET: ${{ secrets.OWNER_SECRET }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download log from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: log-build
+      
+      - name: Download pet-store image
+        uses: actions/download-artifact@v4
+        with:
+          name: pet-store-image
+      
+      - name: Download pet-order image
+        uses: actions/download-artifact@v4
+        with:
+          name: pet-order-image
+      
+      - name: Load Docker images
+        run: |
+          docker load -i pet-store-image.tar
+          docker load -i pet-order-image.tar
+      
+      - name: Start containers with docker compose
+        id: start_containers
+        continue-on-error: true
+        run: |
+          docker compose up -d
+          sleep 15
+      
+      - name: Check container status
+        id: check_containers
+        run: |
+          # Initialize status variables
+          STORE1_STATUS="failed"
+          STORE2_STATUS="failed"
+          ORDER_STATUS="failed"
+          
+          # Check pet-store1
+          if docker ps --format "{{.Names}}" | grep -q "^pet-store1$"; then
+            HEALTH=$(docker inspect --format='{{.State.Running}}' pet-store1 2>/dev/null || echo "false")
+            if [ "$HEALTH" == "true" ]; then
+              STORE1_STATUS="running"
+            fi
+          fi
+          
+          # Check pet-store2
+          if docker ps --format "{{.Names}}" | grep -q "^pet-store2$"; then
+            HEALTH=$(docker inspect --format='{{.State.Running}}' pet-store2 2>/dev/null || echo "false")
+            if [ "$HEALTH" == "true" ]; then
+              STORE2_STATUS="running"
+            fi
+          fi
+          
+          # Check pet-order
+          if docker ps --format "{{.Names}}" | grep -q "^pet-order$"; then
+            HEALTH=$(docker inspect --format='{{.State.Running}}' pet-order 2>/dev/null || echo "false")
+            if [ "$HEALTH" == "true" ]; then
+              ORDER_STATUS="running"
+            fi
+          fi
+          
+          # Line 4: Container status on one line
+          LINE4=""
+          if [ "$STORE1_STATUS" == "running" ]; then
+            LINE4="Container pet-store #1 up and running;"
+          else
+            LINE4="Container pet-store #1 failed to run;"
+          fi
+          
+          if [ "$STORE2_STATUS" == "running" ]; then
+            LINE4="${LINE4}Container pet-store #2 up and running;"
+          else
+            LINE4="${LINE4}Container pet-store #2 failed to run;"
+          fi
+          
+          if [ "$ORDER_STATUS" == "running" ]; then
+            LINE4="${LINE4}Container pet-order up and running;"
+          else
+            LINE4="${LINE4}Container pet-order failed to run;"
+          fi
+          echo "$LINE4" >> log.txt
+          
+          # Export for later use
+          echo "STORE1_STATUS=$STORE1_STATUS" >> $GITHUB_ENV
+          echo "STORE2_STATUS=$STORE2_STATUS" >> $GITHUB_ENV
+          echo "ORDER_STATUS=$ORDER_STATUS" >> $GITHUB_ENV
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:5001/health > /dev/null 2>&1 && \
+               curl -s http://localhost:5002/health > /dev/null 2>&1 && \
+               curl -s http://localhost:5003/health > /dev/null 2>&1 && \
+               curl -s http://localhost:80/store1/health > /dev/null 2>&1; then
+              echo "All services are ready!"
+              break
+            fi
+            echo "Attempt $i: Services not ready yet, waiting..."
+            sleep 2
+          done
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install pytest and requests
+        run: |
+          pip install pytest requests
+      
+      - name: Run pytest tests
+        id: run_tests
+        continue-on-error: true
+        run: |
+          cd tests
+          pytest -v assn4_tests.py 2>&1 | tee ../assn4_test_results.txt
+          PYTEST_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $PYTEST_EXIT_CODE -eq 0 ]; then
+            echo "TESTS_PASSED=true" >> $GITHUB_ENV
+          else
+            echo "TESTS_PASSED=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Update log with test results
+        run: |
+          if [ "$TESTS_PASSED" == "true" ]; then
+            echo "All pytests succeeded" >> log.txt
+          else
+            echo "pytests failed" >> log.txt
+          fi
+      
+      - name: Stop containers
+        if: always()
+        run: |
+          docker compose down || true
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assn4_test_results
+          path: assn4_test_results.txt
+          retention-days: 5
+      
+      - name: Upload updated log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-final
+          path: log.txt
+          retention-days: 5
+      
+      - name: Fail if tests failed
+        if: env.TESTS_PASSED != 'true'
+        run: exit 1
+
+  query:
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      NINJA_API_KEY: ${{ secrets.NINJA_API_KEY }}
+      OWNER_SECRET: ${{ secrets.OWNER_SECRET }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download pet-store image
+        uses: actions/download-artifact@v4
+        with:
+          name: pet-store-image
+      
+      - name: Download pet-order image
+        uses: actions/download-artifact@v4
+        with:
+          name: pet-order-image
+      
+      - name: Load Docker images
+        run: |
+          docker load -i pet-store-image.tar
+          docker load -i pet-order-image.tar
+      
+      - name: Start containers with docker compose
+        run: |
+          docker compose up -d
+          sleep 15
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:5001/health > /dev/null 2>&1 && \
+               curl -s http://localhost:5002/health > /dev/null 2>&1 && \
+               curl -s http://localhost:5003/health > /dev/null 2>&1 && \
+               curl -s http://localhost:80/store1/health > /dev/null 2>&1; then
+              echo "All services are ready!"
+              break
+            fi
+            echo "Attempt $i: Services not ready yet, waiting..."
+            sleep 2
+          done
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install requests
+        run: pip install requests
+      
+      - name: Populate data and execute queries
+        run: |
+          python3 << 'EOF'
+          import requests
+          import json
+          import os
+          
+          PET_STORE_1_URL = "http://localhost:5001"
+          PET_STORE_2_URL = "http://localhost:5002"
+          PET_ORDER_URL = "http://localhost:5003"
+          
+          # Pet Types payloads
+          PET_TYPE1 = {"type": "Golden Retriever"}
+          PET_TYPE2 = {"type": "Australian Shepherd"}
+          PET_TYPE3 = {"type": "Abyssinian"}
+          PET_TYPE4 = {"type": "bulldog"}
+          
+          # Pet payloads (EXACTLY as shown in official assignment slides)
+          PET1_TYPE1 = {"name": "Lander", "birthdate": "14-05-2020"}
+          PET2_TYPE1 = {"name": "Lanky"}  # No birthdate in slides
+          PET3_TYPE1 = {"name": "Shelly", "birthdate": "07-07-2019"}
+          PET4_TYPE2 = {"name": "Felicity", "birthdate": "27-11-2011"}
+          PET5_TYPE3 = {"name": "Muscles"}  # No birthdate in slides
+          PET6_TYPE3 = {"name": "Junior"}  # No birthdate in slides
+          PET7_TYPE4 = {"name": "Lazy", "birthdate": "07-08-2018"}
+          PET8_TYPE4 = {"name": "Lemon", "birthdate": "27-03-2020"}
+          
+          store1_ids = {}
+          store2_ids = {}
+          
+          # Step 1: POST 3 pet-types to store 1
+          print("Posting pet-types to store 1...")
+          for pt, key in [(PET_TYPE1, "type1"), (PET_TYPE2, "type2"), (PET_TYPE3, "type3")]:
+              r = requests.post(f"{PET_STORE_1_URL}/pet-types", json=pt)
+              if r.status_code == 201:
+                  store1_ids[key] = r.json()["id"]
+                  print(f"  Created {pt['type']} with id {store1_ids[key]}")
+          
+          # Step 2: POST 3 pet-types to store 2
+          print("Posting pet-types to store 2...")
+          for pt, key in [(PET_TYPE1, "type1"), (PET_TYPE2, "type2"), (PET_TYPE4, "type4")]:
+              r = requests.post(f"{PET_STORE_2_URL}/pet-types", json=pt)
+              if r.status_code == 201:
+                  store2_ids[key] = r.json()["id"]
+                  print(f"  Created {pt['type']} with id {store2_ids[key]}")
+          
+          # Steps 3-4: POST pets to store 1
+          print("Posting pets to store 1...")
+          requests.post(f"{PET_STORE_1_URL}/pet-types/{store1_ids['type1']}/pets", json=PET1_TYPE1)
+          requests.post(f"{PET_STORE_1_URL}/pet-types/{store1_ids['type1']}/pets", json=PET2_TYPE1)
+          requests.post(f"{PET_STORE_1_URL}/pet-types/{store1_ids['type3']}/pets", json=PET5_TYPE3)
+          requests.post(f"{PET_STORE_1_URL}/pet-types/{store1_ids['type3']}/pets", json=PET6_TYPE3)
+          
+          # Steps 5-7: POST pets to store 2
+          print("Posting pets to store 2...")
+          requests.post(f"{PET_STORE_2_URL}/pet-types/{store2_ids['type1']}/pets", json=PET3_TYPE1)
+          requests.post(f"{PET_STORE_2_URL}/pet-types/{store2_ids['type2']}/pets", json=PET4_TYPE2)
+          requests.post(f"{PET_STORE_2_URL}/pet-types/{store2_ids['type4']}/pets", json=PET7_TYPE4)
+          requests.post(f"{PET_STORE_2_URL}/pet-types/{store2_ids['type4']}/pets", json=PET8_TYPE4)
+          
+          print("Data population complete!")
+          
+          # Read query.txt and execute queries
+          print("Processing query.txt...")
+          responses = []
+          
+          if os.path.exists("query.txt"):
+              with open("query.txt", "r") as f:
+                  content = f.read()
+              
+              # Split by semicolon and process each entry
+              entries = [e.strip() for e in content.split(";") if e.strip()]
+              
+              for entry in entries:
+                  if entry.startswith("query:"):
+                      # Parse query entry
+                      query_part = entry[6:].strip()  # Remove "query:" prefix
+                      parts = query_part.split(",", 1)
+                      store_num = parts[0].strip()
+                      query_string = parts[1].strip() if len(parts) > 1 else ""
+                      
+                      # Determine store URL
+                      if store_num == "1":
+                          url = f"{PET_STORE_1_URL}/pet-types"
+                      else:
+                          url = f"{PET_STORE_2_URL}/pet-types"
+                      
+                      # Add query string if present
+                      if query_string:
+                          url = f"{url}?{query_string}"
+                      
+                      # Execute GET request
+                      r = requests.get(url)
+                      
+                      if r.status_code == 200:
+                          responses.append(f"{r.status_code}\n{json.dumps(r.json())}")
+                      else:
+                          responses.append(f"{r.status_code}\nNONE")
+                  
+                  elif entry.startswith("purchase:"):
+                      # Parse purchase entry
+                      purchase_part = entry[9:].strip()  # Remove "purchase:" prefix
+                      try:
+                          purchase_json = json.loads(purchase_part)
+                          # Remove purchase-id if present (server generates it)
+                          purchase_json.pop("purchase-id", None)
+                          
+                          # Execute POST request
+                          r = requests.post(f"{PET_ORDER_URL}/purchases", json=purchase_json)
+                          
+                          if r.status_code == 201:
+                              responses.append(f"{r.status_code}\n{json.dumps(r.json())}")
+                          else:
+                              responses.append(f"{r.status_code}\nNONE")
+                      except json.JSONDecodeError:
+                          responses.append("400\nNONE")
+          
+          # Write response.txt - always create even if empty
+          with open("response.txt", "w") as f:
+              for resp in responses:
+                  f.write(resp + "\n;\n")
+          
+          print("Query processing complete! Results written to response.txt")
+          EOF
+      
+      - name: Ensure response.txt exists
+        run: |
+          if [ ! -f response.txt ]; then
+            touch response.txt
+          fi
+      
+      - name: Stop containers
+        if: always()
+        run: |
+          docker compose down || true
+      
+      - name: Upload response.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: response
+          path: response.txt
+          retention-days: 5

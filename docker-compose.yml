@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # MongoDB Database Service for Pet Stores
+  # Contains collections: pet_store_1, pet_store_2
+  mongodb-stores:
+    image: mongo:6.0
+    container_name: mongodb-stores
+    expose:
+      - "27017"
+    networks:
+      - petstore-network
+
+  # MongoDB Database Service for Purchases/Transactions
+  # Contains collection: transactions
+  mongodb-purchases:
+    image: mongo:6.0
+    container_name: mongodb-purchases
+    expose:
+      - "27017"
+    networks:
+      - petstore-network
+
+  # Pet Store 1 Service
+  pet-store1:
+    image: pet-store:latest
+    container_name: pet-store1
+    ports:
+      - "5001:8000"
+    expose:
+      - "8000"
+    environment:
+      - PORT=8000
+      - STORE_ID=1
+      - MONGO_URI=mongodb://mongodb-stores:27017
+      - DB_NAME=petstore
+      - COLLECTION_NAME=pet_store_1
+      - NINJA_API_KEY=${NINJA_API_KEY}
+    depends_on:
+      - mongodb-stores
+    networks:
+      - petstore-network
+
+  # Pet Store 2 Service
+  pet-store2:
+    image: pet-store:latest
+    container_name: pet-store2
+    ports:
+      - "5002:8000"
+    expose:
+      - "8000"
+    environment:
+      - PORT=8000
+      - STORE_ID=2
+      - MONGO_URI=mongodb://mongodb-stores:27017
+      - DB_NAME=petstore
+      - COLLECTION_NAME=pet_store_2
+      - NINJA_API_KEY=${NINJA_API_KEY}
+    depends_on:
+      - mongodb-stores
+    networks:
+      - petstore-network
+
+  # Pet Order Service
+  pet-order:
+    image: pet-order:latest
+    container_name: pet-order
+    ports:
+      - "5003:8080"
+    expose:
+      - "8080"
+    environment:
+      - PORT=8080
+      - MONGO_URI=mongodb://mongodb-purchases:27017
+      - DB_NAME=petstore
+      - PET_STORE_1_URL=http://pet-store1:8000
+      - PET_STORE_2_URL=http://pet-store2:8000
+      - OWNER_SECRET=${OWNER_SECRET}
+    depends_on:
+      - mongodb-purchases
+      - pet-store1
+      - pet-store2
+    networks:
+      - petstore-network
+
+  # Nginx reverse proxy — single entry point on port 80
+  # Routes: /store1/* → pet-store1, /store2/* → pet-store2, /orders/* → pet-order
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - pet-store1
+      - pet-store2
+      - pet-order
+    networks:
+      - petstore-network
+
+networks:
+  petstore-network:
+    driver: bridge

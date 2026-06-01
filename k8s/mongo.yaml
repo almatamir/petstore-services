@@ -1,0 +1,98 @@
+# Why StatefulSet and not Deployment:
+# A container's filesystem is temporary — when a pod restarts, it gets a blank slate.
+# A StatefulSet attaches a PersistentVolumeClaim (external disk) to each pod at /data/db.
+# If the pod crashes and restarts, Kubernetes reattaches the same disk — data survives.
+
+# MongoDB for pet store inventory
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-stores
+  namespace: petstore
+spec:
+  serviceName: mongodb-stores
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-stores
+  template:
+    metadata:
+      labels:
+        app: mongodb-stores
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-stores-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-stores-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-stores
+  namespace: petstore
+spec:
+  clusterIP: None   # headless — required for StatefulSet DNS
+  selector:
+    app: mongodb-stores
+  ports:
+    - port: 27017
+      targetPort: 27017
+---
+# MongoDB for purchase transactions
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-purchases
+  namespace: petstore
+spec:
+  serviceName: mongodb-purchases
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-purchases
+  template:
+    metadata:
+      labels:
+        app: mongodb-purchases
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-purchases-data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-purchases-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-purchases
+  namespace: petstore
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb-purchases
+  ports:
+    - port: 27017
+      targetPort: 27017

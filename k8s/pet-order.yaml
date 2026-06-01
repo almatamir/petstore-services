@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pet-order
+  namespace: petstore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pet-order
+  template:
+    metadata:
+      labels:
+        app: pet-order
+    spec:
+      containers:
+        - name: pet-order
+          image: pet-order:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: MONGO_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: MONGO_URI_PURCHASES
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: DB_NAME
+            - name: PET_STORE_1_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: PET_STORE_1_URL
+            - name: PET_STORE_2_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: PET_STORE_2_URL
+            - name: OWNER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-secrets
+                  key: OWNER_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pet-order
+  namespace: petstore
+spec:
+  selector:
+    app: pet-order
+  ports:
+    - port: 8080
+      targetPort: 8080

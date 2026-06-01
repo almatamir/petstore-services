@@ -1,0 +1,112 @@
+# Both stores use the same image — differentiated by env vars only
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pet-store1
+  namespace: petstore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pet-store1
+  template:
+    metadata:
+      labels:
+        app: pet-store1
+    spec:
+      containers:
+        - name: pet-store
+          image: pet-store:latest
+          imagePullPolicy: Never   # use IfNotPresent when pulling from a registry
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PORT
+              value: "8000"
+            - name: STORE_ID
+              value: "1"
+            - name: COLLECTION_NAME
+              value: "pet_store_1"
+            - name: MONGO_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: MONGO_URI_STORES
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: DB_NAME
+            - name: NINJA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-secrets
+                  key: NINJA_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pet-store1
+  namespace: petstore
+spec:
+  selector:
+    app: pet-store1
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pet-store2
+  namespace: petstore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pet-store2
+  template:
+    metadata:
+      labels:
+        app: pet-store2
+    spec:
+      containers:
+        - name: pet-store
+          image: pet-store:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PORT
+              value: "8000"
+            - name: STORE_ID
+              value: "2"
+            - name: COLLECTION_NAME
+              value: "pet_store_2"
+            - name: MONGO_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: MONGO_URI_STORES
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: petstore-config
+                  key: DB_NAME
+            - name: NINJA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: petstore-secrets
+                  key: NINJA_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pet-store2
+  namespace: petstore
+spec:
+  selector:
+    app: pet-store2
+  ports:
+    - port: 8000
+      targetPort: 8000
