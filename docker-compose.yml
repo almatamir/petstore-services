@@ -73,8 +73,7 @@ services:
       - PORT=8080
       - MONGO_URI=mongodb://mongodb-purchases:27017
       - DB_NAME=petstore
-      - PET_STORE_1_URL=http://pet-store1:8000
-      - PET_STORE_2_URL=http://pet-store2:8000
+      - STORE_URLS=http://pet-store1:8000,http://pet-store2:8000
       - OWNER_SECRET=${OWNER_SECRET}
     depends_on:
       - mongodb-purchases

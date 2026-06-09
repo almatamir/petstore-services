@@ -30,3 +30,19 @@ class PetStoreDB:
 
     def delete(self, id):
         self._col.delete_one({"id": id})
+
+    def atomic_remove_pet(self, pet_type_id, pet_name):
+        # Single atomic operation: only matches if pet_name is still in the pets array.
+        # If two concurrent requests race for the same pet, exactly one will get
+        # modified_count=1; the other gets 0 (pet already gone) and should return 404.
+        result = self._col.update_one(
+            {"id": pet_type_id, "pets": pet_name},
+            {
+                "$pull": {"pets": pet_name},
+                "$unset": {
+                    f"pets_details.{pet_name}": "",
+                    f"pets_meta.{pet_name}": ""
+                }
+            }
+        )
+        return result.modified_count > 0

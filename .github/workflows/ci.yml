@@ -1,4 +1,4 @@
-name: assignment4
+name: ci
 
 on:
   push:
@@ -225,7 +225,7 @@ jobs:
         continue-on-error: true
         run: |
           cd tests
-          pytest -v assn4_tests.py 2>&1 | tee ../assn4_test_results.txt
+          pytest -v tests.py 2>&1 | tee ../test_results.txt
           PYTEST_EXIT_CODE=${PIPESTATUS[0]}
           if [ $PYTEST_EXIT_CODE -eq 0 ]; then
             echo "TESTS_PASSED=true" >> $GITHUB_ENV
@@ -250,8 +250,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: assn4_test_results
-          path: assn4_test_results.txt
+          name: test_results
+          path: test_results.txt
           retention-days: 5
       
       - name: Upload updated log

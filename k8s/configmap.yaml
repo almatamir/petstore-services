@@ -7,5 +7,4 @@ data:
   DB_NAME: "petstore"
   MONGO_URI_STORES: "mongodb://mongodb-stores:27017"
   MONGO_URI_PURCHASES: "mongodb://mongodb-purchases:27017"
-  PET_STORE_1_URL: "http://pet-store1:8000"
-  PET_STORE_2_URL: "http://pet-store2:8000"
+  STORE_URLS: "http://pet-store1:8000,http://pet-store2:8000"

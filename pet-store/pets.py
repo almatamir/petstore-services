@@ -369,19 +369,20 @@ def delete_specific_pet(id, name):
     if resolved_name is None:
         return not_found(None)
 
-    pet = pet_type['pets_details'][resolved_name]
-    if pet['picture'] != "NA":
-        filepath = os.path.join(UPLOAD_FOLDER, pet['picture'])
+    # Read picture path before the atomic delete so we can clean up the file.
+    pet = pet_type['pets_details'].get(resolved_name, {})
+    picture = pet.get('picture', 'NA')
+
+    # Atomic: filter includes "pets": resolved_name so only one concurrent
+    # request wins. The loser gets modified_count=0 → 404 → pet_order rolls back.
+    if not db.atomic_remove_pet(id, resolved_name):
+        return not_found(None)
+
+    if picture != "NA":
+        filepath = os.path.join(UPLOAD_FOLDER, picture)
         if os.path.exists(filepath):
             os.remove(filepath)
 
-    del pet_type['pets_details'][resolved_name]
-    meta_store = ensure_meta_store(pet_type)
-    if resolved_name in meta_store:
-        del meta_store[resolved_name]
-    pet_type['pets'] = [n for n in pet_type['pets'] if not case_insensitive_compare(n, resolved_name)]
-
-    db.save(pet_type)
     return "", 204
 
 

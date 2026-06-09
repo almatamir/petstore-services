@@ -1,6 +1,5 @@
 # pet_order.py - Pet Order Service with MongoDB Persistence
 import os
-import re
 import requests
 import random
 import uuid
@@ -16,13 +15,12 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
 DB_NAME = os.getenv("DB_NAME", "petstore")
 TRANSACTIONS_COLLECTION = "transactions"
 
-# Dynamically load all PET_STORE_N_URL env vars — supports any number of stores.
-# Add PET_STORE_3_URL, PET_STORE_4_URL, etc. to scale horizontally.
-_store_url_pattern = re.compile(r'^PET_STORE_(\d+)_URL$')
+# Parse STORE_URLS=http://pet-store1:8000,http://pet-store2:8000,...
+# Store number is 1-based index — add a new store by appending its URL.
 PET_STORE_URLS = {
-    int(m.group(1)): v
-    for k, v in os.environ.items()
-    if (m := _store_url_pattern.match(k)) and v
+    i + 1: url.strip()
+    for i, url in enumerate(os.getenv("STORE_URLS", "").split(','))
+    if url.strip()
 }
 
 # Owner authentication — set OWNER_SECRET in environment, never hardcode

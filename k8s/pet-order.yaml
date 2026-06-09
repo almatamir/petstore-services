@@ -32,16 +32,11 @@ spec:
                 configMapKeyRef:
                   name: petstore-config
                   key: DB_NAME
-            - name: PET_STORE_1_URL
+            - name: STORE_URLS
               valueFrom:
                 configMapKeyRef:
                   name: petstore-config
-                  key: PET_STORE_1_URL
-            - name: PET_STORE_2_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: petstore-config
-                  key: PET_STORE_2_URL
+                  key: STORE_URLS
             - name: OWNER_SECRET
               valueFrom:
                 secretKeyRef:
