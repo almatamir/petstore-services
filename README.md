@@ -59,7 +59,7 @@ Manages pet type inventory for a single store instance. Two replicas run as `pet
 
 Handles purchases across both stores. Randomly selects an available pet if no specific one is requested, saves the transaction first, then removes the pet from store inventory (saga pattern — prevents data loss if either step fails).
 
-Supports any number of stores: add `PET_STORE_N_URL` environment variables and no code changes are needed.
+Supports any number of stores: append URLs to the `STORE_URLS` env var — no code changes needed.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -122,7 +122,7 @@ Services are available at:
 
 ```bash
 pip install pytest requests
-cd tests && pytest -v assn4_tests.py
+cd tests && pytest -v tests.py
 ```
 
 ---
@@ -136,7 +136,7 @@ cd tests && pytest -v assn4_tests.py
 | `MONGO_URI` | both | MongoDB connection string |
 | `STORE_ID` | pet-store | Store instance identifier (`1` or `2`) |
 | `COLLECTION_NAME` | pet-store | MongoDB collection to use (`pet_store_1` or `pet_store_2`) |
-| `PET_STORE_N_URL` | pet-order | URL for store N — add more to scale horizontally |
+| `STORE_URLS` | pet-order | Comma-separated store URLs — append to scale horizontally |
 
 Secrets are loaded from a `.env` file at runtime. See `.env.example` for required values. The `.env` file is gitignored and never committed.
 
@@ -144,7 +144,7 @@ Secrets are loaded from a `.env` file at runtime. See `.env.example` for require
 
 ## CI/CD Pipeline
 
-The GitHub Actions workflow (`.github/workflows/assignment4.yml`) runs on every push with three sequential jobs:
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push with three sequential jobs:
 
 ```
 Code Push
@@ -189,3 +189,50 @@ kubectl apply -f k8s/pet-store.yaml
 kubectl apply -f k8s/pet-order.yaml
 kubectl apply -f k8s/ingress.yaml
 ```
+
+---
+
+## Verified Animal Types (Animals API)
+
+The following types are confirmed to work with `POST /pet-types`. The API requires an **exact name match** — use the values below as-is (case-insensitive).
+
+> Types were verified live against the API. Names like `dog`, `cat`, `panda`, `turtle` return 400 because the Animals API has no exact entry for them.
+
+### Dogs
+`bulldog` · `beagle` · `husky` · `chihuahua` · `dachshund` · `rottweiler` · `dalmatian` · `pug` · `golden retriever` · `border collie` · `australian shepherd`
+
+### Cats
+`abyssinian` · `maine coon` · `ragdoll`
+
+### Wild Cats
+`lion` · `tiger` · `cheetah` · `leopard` · `jaguar` · `lynx` · `bobcat` · `cougar`
+
+### Primates
+`gorilla` · `chimpanzee` · `monkey` · `lemur`
+
+### African / Safari
+`elephant` · `zebra` · `giraffe` · `hyena` · `meerkat`
+
+### Bears & Large Mammals
+`bear` · `wolf` · `fox` · `wolverine` · `ferret`
+
+### Marsupials & Oceania
+`koala` · `kangaroo`
+
+### Deer Family
+`deer` · `elk` · `moose`
+
+### Birds
+`parrot` · `eagle` · `penguin` · `macaw` · `cockatoo` · `flamingo` · `peacock` · `owl` · `falcon` · `duck` · `goose` · `swan` · `chicken` · `parakeet`
+
+### Reptiles
+`iguana` · `chameleon` · `gecko` · `crocodile` · `alligator` · `tortoise`
+
+### Marine
+`dolphin` · `goldfish`
+
+### Farm
+`horse` · `cow` · `pig` · `rabbit`
+
+### Exotic / Unusual
+`hamster` · `hedgehog` · `chinchilla` · `ferret` · `axolotl` · `capybara`
